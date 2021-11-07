@@ -64,6 +64,44 @@ func (c *Client) StreamAllProjects(ctx context.Context, pageSize int, projectsCh
 	nextRequestURL := fmt.Sprintf("%s/%s/%s?%s", c.Host, gitLabAPIPath, "projects", queryParams.Encode())
 
 	for nextRequestURL != "" {
+<<<<<<< HEAD
+		resp, err := c.callGitLabAPI(ctx, nextRequestURL)
+		if err != nil {
+			return fmt.Errorf("stopping stream failed request: %w", err)
+		}
+
+		bodyBytes, err := readHTTPBody(resp.Body)
+		if err != nil {
+			return fmt.Errorf("stopping stream got bad response %s: failed to read response body: %s", resp.Status, err)
+		}
+
+		if resp.StatusCode > 299 {
+			return fmt.Errorf("stopping stream, got bad response %s: %s", resp.Status, string(bodyBytes))
+		}
+
+		projects := make([]Project, 0)
+		if err := json.Unmarshal(bodyBytes, &projects); err != nil {
+			return fmt.Errorf("stopping stream, failed to unmarshal response: %w", err)
+		}
+
+		for _, p := range projects {
+			projectsChan <- p
+		}
+
+		lhs := resp.Header.Get("Link")
+		if lhs == "" {
+			return nil
+		}
+
+		linkHeaders, err := parseLinkHeaders(lhs)
+		if err != nil {
+			return fmt.Errorf("failed to parse link header: %w", err)
+		}
+
+		nextLinkHeader := getNextLinkFromLinkHeaders(linkHeaders)
+		if nextLinkHeader.link == "" {
+			return errors.New("nextLinkHeader is empty")
+=======
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -91,12 +129,7 @@ func (c *Client) StreamAllProjects(ctx context.Context, pageSize int, projectsCh
 				projectsChan <- p
 			}
 
-			lhs := resp.Header.Get("Link")
-			if lhs == "" {
-				return nil
-			}
-
-			linkHeaders, err := parseLinkHeaders(lhs)
+			linkHeaders, err := parseLinkHeaders(resp.Header.Get("Link"))
 			if err != nil {
 				return fmt.Errorf("failed to parse link header: %w", err)
 			}
@@ -107,7 +140,9 @@ func (c *Client) StreamAllProjects(ctx context.Context, pageSize int, projectsCh
 			}
 
 			nextRequestURL = nextLinkHeader.link
+>>>>>>> Add context propagation
 		}
+
 	}
 
 	return nil

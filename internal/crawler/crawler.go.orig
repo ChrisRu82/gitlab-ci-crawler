@@ -105,7 +105,12 @@ func (c *Crawler) updateProjectInGraph(ctx context.Context, project gitlab.Proje
 		c.projectSet[project.PathWithNamespace] = struct{}{}
 		c.projectSetMut.Unlock()
 
+<<<<<<< HEAD
 		if err := c.storage.CreateProjectNode(project.PathWithNamespace); err != nil {
+=======
+		projectCypher := fmt.Sprintf("MERGE (p:Project {name: '%s'})", project.PathWithNamespace)
+		if err := c.createNode(ctx, projectCypher, nil); err != nil {
+>>>>>>> Add context propagation
 			return fmt.Errorf("failed to write project to neo4j: %w", err)
 		}
 
@@ -151,6 +156,15 @@ func (c *Crawler) traverseIncludes(ctx context.Context, parentName string, inclu
 		Ref:           include.Ref,
 		Files:         include.Files,
 	}); err != nil {
+=======
+	includeCypher := fmt.Sprintf("MERGE (p:Project {name: '%s'})", include.Project)
+	if err := c.createNode(ctx, includeCypher, nil); err != nil {
+		return fmt.Errorf("failed to write project to neo4j: %w", err)
+	}
+
+	pCypher := fmt.Sprintf("MATCH (p:Project {name: '%s'})\nMATCH (p2:Project {name: '%s'})\nMERGE (p)-[rel:INCLUDES {ref: '%s', files:'%s'}]->(p2)", parentName, include.Project, include.Ref, strings.Join(include.Files, ","))
+	if err := c.createNode(ctx, pCypher, nil); err != nil {
+>>>>>>> Add context propagation
 		return fmt.Errorf("failed to write neo4j transaction: %w", err)
 	}
 
@@ -162,3 +176,27 @@ func (c *Crawler) traverseIncludes(ctx context.Context, parentName string, inclu
 
 	return nil
 }
+<<<<<<< HEAD
+=======
+
+func (c *Crawler) createNode(ctx context.Context, cypher string, params map[string]interface{}) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		_, err := c.neo4jSession.WriteTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
+			result, err := transaction.Run(cypher, params)
+			if err != nil {
+				return nil, err
+			}
+
+			if !result.Next() {
+				return nil, result.Err()
+			}
+
+			return nil, nil
+		})
+		return err
+	}
+}
+>>>>>>> Add context propagation

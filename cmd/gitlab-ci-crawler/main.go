@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"github.com/deichindianer/gitlab-ci-crawler/internal/storage/neo4j"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/ardanlabs/conf/v2"
 	"github.com/deichindianer/gitlab-ci-crawler/internal/crawler"
@@ -15,6 +18,16 @@ var cfg crawler.Config
 var neo4jcfg neo4j.Config
 
 func main() {
+	rootCtx, rootCancel := context.WithCancel(context.Background())
+
+	shutdownChan := make(chan os.Signal, 2)
+	signal.Notify(shutdownChan, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-shutdownChan
+		rootCancel()
+	}()
+
 	help, err := conf.Parse("", &cfg)
 	if err != nil {
 		if errors.Is(err, conf.ErrHelpWanted) {
@@ -45,7 +58,7 @@ func main() {
 		log.Fatalf("failed to setup crawler: %s\n", err)
 	}
 
-	if err := c.Crawl(context.Background()); err != nil {
+	if err := c.Crawl(rootCtx); err != nil {
 		log.Fatalf("failed to gather project data: %s", err)
 	}
 }
